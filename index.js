@@ -199,7 +199,7 @@ async function handleSlashVoteCommand(interaction) {
                 },
                 {
                     name: 'Status',
-                    value: 'Active',
+                    value: '🔵 Active',
                     inline: true
                 }
             ])
@@ -249,7 +249,7 @@ async function handleSlashVoteCommand(interaction) {
             await endVote(interaction.channel.id, voteMessage);
         }, duration.milliseconds);
 
-        // Update vote count every 5 seconds (more frequent for color changes)
+        // Update vote count every 1 second for very fast color changes
         const updateInterval = setInterval(async () => {
             try {
                 if (!activeVotes.has(interaction.channel.id)) {
@@ -261,7 +261,7 @@ async function handleSlashVoteCommand(interaction) {
                 console.error('Error in update interval:', updateError);
                 clearInterval(updateInterval);
             }
-        }, 5000); // Changed to 5 seconds for smoother color transitions
+        }, 1000); // Very fast updates for dramatic color transitions
 
     } catch (error) {
         console.error('❌ Error in handleSlashVoteCommand:', error);
@@ -424,41 +424,76 @@ function getDynamicColor(timeRemaining, totalDuration) {
     // Calculate progress (0 = start, 1 = end)
     const progress = 1 - (timeRemaining / totalDuration);
     
-    // Color transition: Blue -> Purple -> Pink -> Red -> Orange -> Yellow
-    if (progress <= 0.2) {
-        // Blue to Purple (0-20%)
-        const localProgress = progress / 0.2;
-        const r = Math.floor(88 + (148 * localProgress));   // 88 -> 236
-        const g = Math.floor(101 + (-37 * localProgress));  // 101 -> 64
-        const b = Math.floor(242 + (-102 * localProgress)); // 242 -> 140
+    // Very fast color progression with 10 distinct phases
+    if (progress <= 0.10) {
+        // Deep Blue (0-10%)
+        const localProgress = progress / 0.10;
+        const r = Math.floor(65 + (35 * localProgress));     // 65 -> 100
+        const g = Math.floor(105 + (40 * localProgress));    // 105 -> 145
+        const b = Math.floor(225 + (30 * localProgress));    // 225 -> 255
         return (r << 16) | (g << 8) | b;
-    } else if (progress <= 0.4) {
-        // Purple to Pink (20-40%)
-        const localProgress = (progress - 0.2) / 0.2;
-        const r = Math.floor(236 + (19 * localProgress));   // 236 -> 255
-        const g = Math.floor(64 + (128 * localProgress));   // 64 -> 192
-        const b = Math.floor(140 + (63 * localProgress));   // 140 -> 203
+    } else if (progress <= 0.20) {
+        // Blue to Cyan (10-20%)
+        const localProgress = (progress - 0.10) / 0.10;
+        const r = Math.floor(100 + (-35 * localProgress));   // 100 -> 65
+        const g = Math.floor(145 + (60 * localProgress));    // 145 -> 205
+        const b = 255;                                        // 255 -> 255
         return (r << 16) | (g << 8) | b;
-    } else if (progress <= 0.6) {
-        // Pink to Red (40-60%)
-        const localProgress = (progress - 0.4) / 0.2;
-        const r = 255;                                       // 255 -> 255
-        const g = Math.floor(192 + (-127 * localProgress)); // 192 -> 65
-        const b = Math.floor(203 + (-138 * localProgress)); // 203 -> 65
+    } else if (progress <= 0.30) {
+        // Cyan to Teal (20-30%)
+        const localProgress = (progress - 0.20) / 0.10;
+        const r = Math.floor(65 + (65 * localProgress));     // 65 -> 130
+        const g = Math.floor(205 + (-25 * localProgress));   // 205 -> 180
+        const b = Math.floor(255 + (-55 * localProgress));   // 255 -> 200
         return (r << 16) | (g << 8) | b;
-    } else if (progress <= 0.8) {
-        // Red to Orange (60-80%)
-        const localProgress = (progress - 0.6) / 0.2;
-        const r = 255;                                       // 255 -> 255
-        const g = Math.floor(65 + (100 * localProgress));   // 65 -> 165
-        const b = 65;                                        // 65 -> 65
+    } else if (progress <= 0.40) {
+        // Teal to Purple (30-40%)
+        const localProgress = (progress - 0.30) / 0.10;
+        const r = Math.floor(130 + (75 * localProgress));    // 130 -> 205
+        const g = Math.floor(180 + (-90 * localProgress));   // 180 -> 90
+        const b = Math.floor(200 + (25 * localProgress));    // 200 -> 225
+        return (r << 16) | (g << 8) | b;
+    } else if (progress <= 0.50) {
+        // Purple to Magenta (40-50%)
+        const localProgress = (progress - 0.40) / 0.10;
+        const r = Math.floor(205 + (50 * localProgress));    // 205 -> 255
+        const g = Math.floor(90 + (70 * localProgress));     // 90 -> 160
+        const b = Math.floor(225 + (30 * localProgress));    // 225 -> 255
+        return (r << 16) | (g << 8) | b;
+    } else if (progress <= 0.60) {
+        // Magenta to Hot Pink (50-60%)
+        const localProgress = (progress - 0.50) / 0.10;
+        const r = 255;                                        // 255 -> 255
+        const g = Math.floor(160 + (35 * localProgress));    // 160 -> 195
+        const b = Math.floor(255 + (-135 * localProgress));  // 255 -> 120
+        return (r << 16) | (g << 8) | b;
+    } else if (progress <= 0.70) {
+        // Hot Pink to Red (60-70%)
+        const localProgress = (progress - 0.60) / 0.10;
+        const r = 255;                                        // 255 -> 255
+        const g = Math.floor(195 + (-130 * localProgress));  // 195 -> 65
+        const b = Math.floor(120 + (-55 * localProgress));   // 120 -> 65
+        return (r << 16) | (g << 8) | b;
+    } else if (progress <= 0.80) {
+        // Red to Red-Orange (70-80%)
+        const localProgress = (progress - 0.70) / 0.10;
+        const r = 255;                                        // 255 -> 255
+        const g = Math.floor(65 + (65 * localProgress));     // 65 -> 130
+        const b = 65;                                         // 65 -> 65
+        return (r << 16) | (g << 8) | b;
+    } else if (progress <= 0.90) {
+        // Red-Orange to Orange (80-90%)
+        const localProgress = (progress - 0.80) / 0.10;
+        const r = 255;                                        // 255 -> 255
+        const g = Math.floor(130 + (35 * localProgress));    // 130 -> 165
+        const b = Math.floor(65 + (15 * localProgress));     // 65 -> 80
         return (r << 16) | (g << 8) | b;
     } else {
-        // Orange to Yellow (80-100%)
-        const localProgress = (progress - 0.8) / 0.2;
-        const r = 255;                                       // 255 -> 255
-        const g = Math.floor(165 + (90 * localProgress));   // 165 -> 255
-        const b = Math.floor(65 + (65 * localProgress));    // 65 -> 130
+        // Orange to Bright Yellow-Orange (90-100%)
+        const localProgress = (progress - 0.90) / 0.10;
+        const r = 255;                                        // 255 -> 255
+        const g = Math.floor(165 + (50 * localProgress));    // 165 -> 215
+        const b = Math.floor(80 + (50 * localProgress));     // 80 -> 130
         return (r << 16) | (g << 8) | b;
     }
 }
@@ -466,41 +501,17 @@ function getDynamicColor(timeRemaining, totalDuration) {
 function getStatusWithColor(timeRemaining, totalDuration) {
     const progress = 1 - (timeRemaining / totalDuration);
     
-    if (progress <= 0.2) return '🔵 Active';
-    else if (progress <= 0.4) return '🟣 Active';
-    else if (progress <= 0.6) return '🟡 Active';
-    else if (progress <= 0.8) return '🟠 Active';
-    else return '🔴 Ending Soon';
+    if (progress <= 0.10) return '🔵 Active';
+    else if (progress <= 0.20) return '🔵 Active';
+    else if (progress <= 0.30) return '🟢 Active';
+    else if (progress <= 0.40) return '🟣 Active';
+    else if (progress <= 0.50) return '🟡 Active';
+    else if (progress <= 0.60) return '🔴 Active';
+    else if (progress <= 0.70) return '🟠 Active';
+    else if (progress <= 0.80) return '🟤 Ending Soon';
+    else if (progress <= 0.90) return '⚫ Final Phase';
+    else return '⚪ Last Seconds';
 }
-
-client.on('interactionCreate', async (interaction) => {
-    try {
-        if (interaction.isChatInputCommand()) {
-            console.log(`💬 Slash command received: /${interaction.commandName}`);
-            
-            if (interaction.commandName === 'tier-vote') {
-                await handleSlashVoteCommand(interaction);
-            } else if (interaction.commandName === 'help') {
-                await handleSlashHelpCommand(interaction);
-            }
-        } else if (interaction.isStringSelectMenu()) {
-            await handleSelectMenu(interaction);
-        }
-    } catch (error) {
-        console.error('❌ Error handling interaction:', error);
-        
-        const errorEmbed = new EmbedBuilder()
-            .setTitle('Error')
-            .setDescription('An error occurred while processing your request.')
-            .setColor(ERROR_COLOR);
-        
-        if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ embeds: [errorEmbed], ephemeral: true });
-        } else {
-            await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
-        }
-    }
-});
 
 async function endVote(channelId, voteMessage) {
     const voteData = activeVotes.get(channelId);
