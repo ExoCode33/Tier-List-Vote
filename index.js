@@ -57,7 +57,9 @@ const WARNING_COLOR = 0xFEE75C; // Discord Yellow
 const ERROR_COLOR = 0xED4245; // Discord Red
 
 client.on('ready', () => {
-    console.log(`TierVote Pro: ${client.user.tag} is now online and ready!`);
+    console.log(`✅ TierVote Pro: ${client.user.tag} is now online and ready!`);
+    console.log(`📊 Bot ID: ${client.user.id}`);
+    console.log(`🔗 Invite URL: https://discord.com/api/oauth2/authorize?client_id=${client.user.id}&permissions=274877916160&scope=bot`);
     
     // Set professional bot status
     client.user.setActivity('tier list votes | /Tier-Vote', { 
@@ -67,35 +69,47 @@ client.on('ready', () => {
 
 client.on('messageCreate', async (message) => {
     try {
-        if (message.author.bot) return;
+        // More detailed logging
+        console.log(`📨 Message from ${message.author.username} (${message.author.id}): "${message.content}"`);
+        console.log(`🤖 Is bot: ${message.author.bot}`);
+        console.log(`📍 Channel: ${message.channel.name || 'DM'} (${message.channel.id})`);
+        
+        if (message.author.bot) {
+            console.log('❌ Ignoring bot message');
+            return;
+        }
 
         // Debug logging
-        console.log(`Message received: "${message.content}"`);
+        console.log(`📝 Processing message: "${message.content}"`);
 
         // Handle /Tier-Vote command (case insensitive)
         if (message.content.toLowerCase().startsWith('/tier-vote')) {
-            console.log('Tier-Vote command detected!');
+            console.log('🗳️ Tier-Vote command detected!');
             await handleVoteCommand(message);
             return;
         }
         
         // Handle /help command
         if (message.content === '/help' || message.content === '/commands') {
+            console.log('❓ Help command detected!');
             await sendHelpMessage(message);
             return;
         }
 
         // Test command to verify bot is working
         if (message.content === '/test') {
+            console.log('🧪 Test command detected!');
             await message.reply('✅ Bot is working! Try `/Tier-Vote "Test Topic" 30s`');
             return;
         }
+
+        console.log('🔍 No matching command found');
     } catch (error) {
-        console.error('Error in messageCreate:', error);
+        console.error('❌ Error in messageCreate:', error);
         try {
             await message.reply('❌ An error occurred. Please try again.');
         } catch (replyError) {
-            console.error('Failed to send error message:', replyError);
+            console.error('❌ Failed to send error message:', replyError);
         }
     }
 });
@@ -583,4 +597,13 @@ setInterval(() => {
 }, 300000); // Every 5 minutes
 
 // Login with bot token
-client.login(process.env.DISCORD_TOKEN);
+console.log('🚀 Attempting to login...');
+client.login(process.env.DISCORD_TOKEN)
+    .then(() => {
+        console.log('✅ Login successful!');
+    })
+    .catch((error) => {
+        console.error('❌ Login failed:', error);
+        console.error('🔍 Check your DISCORD_TOKEN environment variable');
+        process.exit(1);
+    });
