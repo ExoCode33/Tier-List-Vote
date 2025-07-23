@@ -249,7 +249,7 @@ async function handleSlashVoteCommand(interaction) {
             await endVote(interaction.channel.id, voteMessage);
         }, duration.milliseconds);
 
-        // Update vote count every 10 seconds
+        // Update vote count every 5 seconds (more frequent for color changes)
         const updateInterval = setInterval(async () => {
             try {
                 if (!activeVotes.has(interaction.channel.id)) {
@@ -261,7 +261,7 @@ async function handleSlashVoteCommand(interaction) {
                 console.error('Error in update interval:', updateError);
                 clearInterval(updateInterval);
             }
-        }, 10000);
+        }, 5000); // Changed to 5 seconds for smoother color transitions
 
     } catch (error) {
         console.error('❌ Error in handleSlashVoteCommand:', error);
@@ -373,13 +373,29 @@ function parseDuration(durationStr) {
     return { valid, milliseconds };
 }
 
+function formatTimeRemaining(milliseconds) {
+    if (milliseconds <= 0) return '0s';
+    
+    const seconds = Math.ceil(milliseconds / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+}
+
 async function updateVoteEmbed(voteMessage, voteData) {
     try {
         const voteCount = voteData.votes.size;
         const timeRemaining = Math.max(0, voteData.duration - (Date.now() - voteData.startTime));
         const timeRemainingText = formatTimeRemaining(timeRemaining);
+        
+        // Get dynamic color based on remaining time
+        const dynamicColor = getDynamicColor(timeRemaining, voteData.duration);
+        const statusWithColor = getStatusWithColor(timeRemaining, voteData.duration);
 
         const updatedEmbed = EmbedBuilder.from(voteMessage.embeds[0])
+            .setColor(dynamicColor) // Dynamic color that changes over time
             .setFields([
                 {
                     name: 'Time Remaining',
@@ -393,7 +409,7 @@ async function updateVoteEmbed(voteMessage, voteData) {
                 },
                 {
                     name: 'Status',
-                    value: timeRemaining > 0 ? 'Active' : 'Ending',
+                    value: statusWithColor, // Status with colored emoji
                     inline: true
                 }
             ]);
@@ -404,15 +420,57 @@ async function updateVoteEmbed(voteMessage, voteData) {
     }
 }
 
-function formatTimeRemaining(milliseconds) {
-    if (milliseconds <= 0) return '0s';
+function getDynamicColor(timeRemaining, totalDuration) {
+    // Calculate progress (0 = start, 1 = end)
+    const progress = 1 - (timeRemaining / totalDuration);
     
-    const seconds = Math.ceil(milliseconds / 1000);
-    if (seconds < 60) return `${seconds}s`;
+    // Color transition: Blue -> Purple -> Pink -> Red -> Orange -> Yellow
+    if (progress <= 0.2) {
+        // Blue to Purple (0-20%)
+        const localProgress = progress / 0.2;
+        const r = Math.floor(88 + (148 * localProgress));   // 88 -> 236
+        const g = Math.floor(101 + (-37 * localProgress));  // 101 -> 64
+        const b = Math.floor(242 + (-102 * localProgress)); // 242 -> 140
+        return (r << 16) | (g << 8) | b;
+    } else if (progress <= 0.4) {
+        // Purple to Pink (20-40%)
+        const localProgress = (progress - 0.2) / 0.2;
+        const r = Math.floor(236 + (19 * localProgress));   // 236 -> 255
+        const g = Math.floor(64 + (128 * localProgress));   // 64 -> 192
+        const b = Math.floor(140 + (63 * localProgress));   // 140 -> 203
+        return (r << 16) | (g << 8) | b;
+    } else if (progress <= 0.6) {
+        // Pink to Red (40-60%)
+        const localProgress = (progress - 0.4) / 0.2;
+        const r = 255;                                       // 255 -> 255
+        const g = Math.floor(192 + (-127 * localProgress)); // 192 -> 65
+        const b = Math.floor(203 + (-138 * localProgress)); // 203 -> 65
+        return (r << 16) | (g << 8) | b;
+    } else if (progress <= 0.8) {
+        // Red to Orange (60-80%)
+        const localProgress = (progress - 0.6) / 0.2;
+        const r = 255;                                       // 255 -> 255
+        const g = Math.floor(65 + (100 * localProgress));   // 65 -> 165
+        const b = 65;                                        // 65 -> 65
+        return (r << 16) | (g << 8) | b;
+    } else {
+        // Orange to Yellow (80-100%)
+        const localProgress = (progress - 0.8) / 0.2;
+        const r = 255;                                       // 255 -> 255
+        const g = Math.floor(165 + (90 * localProgress));   // 165 -> 255
+        const b = Math.floor(65 + (65 * localProgress));    // 65 -> 130
+        return (r << 16) | (g << 8) | b;
+    }
+}
+
+function getStatusWithColor(timeRemaining, totalDuration) {
+    const progress = 1 - (timeRemaining / totalDuration);
     
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+    if (progress <= 0.2) return '🔵 Active';
+    else if (progress <= 0.4) return '🟣 Active';
+    else if (progress <= 0.6) return '🟡 Active';
+    else if (progress <= 0.8) return '🟠 Active';
+    else return '🔴 Ending Soon';
 }
 
 client.on('interactionCreate', async (interaction) => {
