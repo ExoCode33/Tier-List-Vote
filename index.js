@@ -68,8 +68,12 @@ client.on('ready', () => {
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    // Handle /Tier-Vote command
-    if (message.content.startsWith('/Tier-Vote')) {
+    // Debug logging
+    console.log(`Message received: "${message.content}"`);
+
+    // Handle /Tier-Vote command (case insensitive)
+    if (message.content.toLowerCase().startsWith('/tier-vote')) {
+        console.log('Tier-Vote command detected!');
         await handleVoteCommand(message);
     }
     
@@ -77,10 +81,17 @@ client.on('messageCreate', async (message) => {
     if (message.content === '/help' || message.content === '/commands') {
         await sendHelpMessage(message);
     }
+
+    // Test command to verify bot is working
+    if (message.content === '/test') {
+        await message.reply('✅ Bot is working! Try `/Tier-Vote "Test Topic" 30s`');
+    }
 });
 
 async function handleVoteCommand(message) {
+    console.log('handleVoteCommand called');
     const args = message.content.split(' ');
+    console.log('Args:', args);
     
     if (args.length < 3) {
         const errorEmbed = new EmbedBuilder()
