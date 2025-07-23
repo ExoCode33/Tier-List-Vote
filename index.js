@@ -182,7 +182,7 @@ async function handleSlashVoteCommand(interaction) {
         // Create professional voting embed
         const voteEmbed = new EmbedBuilder()
             .setTitle(`Tier List Vote`)
-            .setDescription(`**Topic:** ${topic}\n\nSelect your tier classification from the dropdown menu below. Each tier represents a different level of quality and performance.\n\n**Tier Classifications:**\n${Object.entries(tierConfig).map(([tier, config]) => 
+            .setDescription(`# ${topic}\n\nSelect your tier classification from the dropdown menu below. Each tier represents a different level of quality and performance.\n\n**Tier Classifications:**\n${Object.entries(tierConfig).map(([tier, config]) => 
                 `**${config.label}** - ${config.description.split(' - ')[1]}`
             ).join('\n')}`)
             .setColor(BRAND_COLOR)
@@ -199,7 +199,7 @@ async function handleSlashVoteCommand(interaction) {
                 },
                 {
                     name: 'Status',
-                    value: '🔵 Active',
+                    value: '🟢 Active',
                     inline: true
                 }
             ])
@@ -501,16 +501,10 @@ function getDynamicColor(timeRemaining, totalDuration) {
 function getStatusWithColor(timeRemaining, totalDuration) {
     const progress = 1 - (timeRemaining / totalDuration);
     
-    if (progress <= 0.10) return '🔵 Active';
-    else if (progress <= 0.20) return '🔵 Active';
-    else if (progress <= 0.30) return '🟢 Active';
-    else if (progress <= 0.40) return '🟣 Active';
-    else if (progress <= 0.50) return '🟡 Active';
-    else if (progress <= 0.60) return '🔴 Active';
-    else if (progress <= 0.70) return '🟠 Active';
-    else if (progress <= 0.80) return '🟤 Ending Soon';
-    else if (progress <= 0.90) return '⚫ Final Phase';
-    else return '⚪ Last Seconds';
+    if (progress <= 0.50) return '🟢 Active';
+    else if (progress <= 0.75) return '🟡 Active';
+    else if (progress <= 0.95) return '🔴 Ending Soon';
+    else return '⚪ Final Seconds';
 }
 
 async function endVote(channelId, voteMessage) {
