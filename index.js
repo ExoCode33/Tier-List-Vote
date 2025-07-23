@@ -144,8 +144,20 @@ async function handleVoteCommand(message) {
                 value: 'Active',
                 inline: true
             }
-        ])
-        .setFooter({ 
+        ]);
+
+    // Add voter analysis if there are votes
+    if (totalVotes > 0) {
+        resultsEmbed.addFields([
+            {
+                name: 'Voter Analysis',
+                value: `**Highest Rating (${tierConfig[highestRating.tier].label}):** ${formatUsers(highestVoterNames)}\n**Lowest Rating (${tierConfig[lowestRating.tier].label}):** ${formatUsers(lowestVoterNames)}`,
+                inline: false
+            }
+        ]);
+    }
+
+    resultsEmbed.setFooter({ 
             text: `Started by ${message.author.displayName} • TierVote Pro`,
             iconURL: message.author.displayAvatarURL({ dynamic: true })
         })
@@ -349,10 +361,29 @@ async function endVote(channelId, voteMessage) {
     let totalVotes = 0;
     let totalValue = 0;
 
-    for (const tier of votes.values()) {
+    // Track highest and lowest ratings
+    let highestRating = { value: 0, users: [], tier: '' };
+    let lowestRating = { value: 7, users: [], tier: '' };
+
+    for (const [userId, tier] of votes.entries()) {
+        const tierValue = tierConfig[tier].value;
         tierCounts[tier]++;
         totalVotes++;
-        totalValue += tierConfig[tier].value;
+        totalValue += tierValue;
+
+        // Track highest ratings
+        if (tierValue > highestRating.value) {
+            highestRating = { value: tierValue, users: [userId], tier: tier };
+        } else if (tierValue === highestRating.value) {
+            highestRating.users.push(userId);
+        }
+
+        // Track lowest ratings
+        if (tierValue < lowestRating.value) {
+            lowestRating = { value: tierValue, users: [userId], tier: tier };
+        } else if (tierValue === lowestRating.value) {
+            lowestRating.users.push(userId);
+        }
     }
 
     // Calculate average and determine final tier
@@ -371,6 +402,32 @@ async function endVote(channelId, voteMessage) {
     }
 
     const finalConfig = tierConfig[finalTier];
+    
+    // Helper function to get user display names
+    async function getUserDisplayNames(userIds) {
+        const names = [];
+        for (const userId of userIds) {
+            try {
+                const user = await channel.guild.members.fetch(userId);
+                names.push(user.displayName || user.user.username);
+            } catch (error) {
+                names.push('Unknown User');
+            }
+        }
+        return names;
+    }
+
+    // Get display names for highest and lowest voters
+    const highestVoterNames = totalVotes > 0 ? await getUserDisplayNames(highestRating.users) : [];
+    const lowestVoterNames = totalVotes > 0 ? await getUserDisplayNames(lowestRating.users) : [];
+
+    // Format user mentions
+    const formatUsers = (names) => {
+        if (names.length === 0) return 'None';
+        if (names.length === 1) return names[0];
+        if (names.length === 2) return `${names[0]} and ${names[1]}`;
+        return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+    };
     
     // Create professional results embed
     const resultsEmbed = new EmbedBuilder()
@@ -400,8 +457,8 @@ async function endVote(channelId, voteMessage) {
                 value: `**Total Participants:** ${totalVotes}\n**Vote Duration:** ${voteData.durationText}\n**Completion Rate:** 100%`,
                 inline: true
             }
-        ])
-        .setFooter({ 
+        ]);
+    resultsEmbed.setFooter({
             text: `Vote ended • Started by ${voteData.authorName} • TierVote Pro`,
             iconURL: voteMessage.client.users.cache.get(voteData.authorId)?.displayAvatarURL({ dynamic: true })
         })
