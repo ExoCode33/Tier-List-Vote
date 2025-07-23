@@ -66,43 +66,56 @@ client.on('ready', () => {
 });
 
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+    try {
+        if (message.author.bot) return;
 
-    // Debug logging
-    console.log(`Message received: "${message.content}"`);
+        // Debug logging
+        console.log(`Message received: "${message.content}"`);
 
-    // Handle /Tier-Vote command (case insensitive)
-    if (message.content.toLowerCase().startsWith('/tier-vote')) {
-        console.log('Tier-Vote command detected!');
-        await handleVoteCommand(message);
-    }
-    
-    // Handle /help command
-    if (message.content === '/help' || message.content === '/commands') {
-        await sendHelpMessage(message);
-    }
+        // Handle /Tier-Vote command (case insensitive)
+        if (message.content.toLowerCase().startsWith('/tier-vote')) {
+            console.log('Tier-Vote command detected!');
+            await handleVoteCommand(message);
+            return;
+        }
+        
+        // Handle /help command
+        if (message.content === '/help' || message.content === '/commands') {
+            await sendHelpMessage(message);
+            return;
+        }
 
-    // Test command to verify bot is working
-    if (message.content === '/test') {
-        await message.reply('✅ Bot is working! Try `/Tier-Vote "Test Topic" 30s`');
+        // Test command to verify bot is working
+        if (message.content === '/test') {
+            await message.reply('✅ Bot is working! Try `/Tier-Vote "Test Topic" 30s`');
+            return;
+        }
+    } catch (error) {
+        console.error('Error in messageCreate:', error);
+        try {
+            await message.reply('❌ An error occurred. Please try again.');
+        } catch (replyError) {
+            console.error('Failed to send error message:', replyError);
+        }
     }
 });
 
 async function handleVoteCommand(message) {
-    console.log('handleVoteCommand called');
-    const args = message.content.split(' ');
-    console.log('Args:', args);
-    
-    if (args.length < 3) {
-        const errorEmbed = new EmbedBuilder()
-            .setTitle('Invalid Command Usage')
-            .setDescription('**Correct Usage:**\n```/Tier-Vote <topic> <duration>```\n\n**Examples:**\n• `/Tier-Vote "Best Development Framework" 1m`\n• `/Tier-Vote "Quarterly Performance Review" 30s`\n• `/Tier-Vote "Product Feature Priority" 2m`')
-            .setColor(ERROR_COLOR)
-            .setFooter({ text: 'TierVote Pro • Professional Voting System' })
-            .setTimestamp();
+    try {
+        console.log('handleVoteCommand called');
+        const args = message.content.split(' ');
+        console.log('Args:', args);
         
-        return message.reply({ embeds: [errorEmbed] });
-    }
+        if (args.length < 3) {
+            const errorEmbed = new EmbedBuilder()
+                .setTitle('Invalid Command Usage')
+                .setDescription('**Correct Usage:**\n```/Tier-Vote <topic> <duration>```\n\n**Examples:**\n• `/Tier-Vote "Best Development Framework" 1m`\n• `/Tier-Vote "Test Topic" 30s`\n• `/Tier-Vote "Product Feature Priority" 2m`')
+                .setColor(ERROR_COLOR)
+                .setFooter({ text: 'TierVote Pro • Professional Voting System' })
+                .setTimestamp();
+            
+            return message.reply({ embeds: [errorEmbed] });
+        }
 
     const topic = args.slice(1, -1).join(' ');
     const durationArg = args[args.length - 1].toLowerCase();
@@ -523,22 +536,37 @@ async function endVote(channelId, voteMessage) {
     activeVotes.delete(channelId);
 }
 
-// Error handling
+// Enhanced error handling with keep-alive
 process.on('unhandledRejection', (error) => {
     console.error('Unhandled promise rejection:', error);
+    // Don't exit on unhandled rejections in production
 });
 
 process.on('uncaughtException', (error) => {
     console.error('Uncaught exception:', error);
-    process.exit(1);
+    // Don't exit immediately, try to recover
+    setTimeout(() => {
+        console.log('Attempting to recover...');
+    }, 1000);
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-    console.log('Shutting down gracefully...');
+    console.log('🔄 Shutting down gracefully...');
     client.destroy();
     process.exit(0);
 });
+
+process.on('SIGTERM', () => {
+    console.log('🔄 Received SIGTERM, shutting down gracefully...');
+    client.destroy();
+    process.exit(0);
+});
+
+// Keep the process alive
+setInterval(() => {
+    console.log('Bot heartbeat - Active votes:', activeVotes.size);
+}, 300000); // Every 5 minutes
 
 // Login with bot token
 client.login(process.env.DISCORD_TOKEN);
