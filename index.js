@@ -1,0 +1,476 @@
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ActivityType } = require('discord.js');
+
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+    ],
+});
+
+// Store active votes
+const activeVotes = new Map();
+
+// Professional tier configuration
+const tierConfig = {
+    'S': { 
+        value: 6, 
+        label: 'S-Tier', 
+        description: 'Exceptional - Outstanding performance and quality',
+        color: '#FFD700'
+    },
+    'A': { 
+        value: 5, 
+        label: 'A-Tier', 
+        description: 'Excellent - High quality with minor areas for improvement',
+        color: '#4A90E2'
+    },
+    'B': { 
+        value: 4, 
+        label: 'B-Tier', 
+        description: 'Very Good - Above average with solid performance',
+        color: '#50C878'
+    },
+    'C': { 
+        value: 3, 
+        label: 'C-Tier', 
+        description: 'Average - Meets expectations with standard quality',
+        color: '#FFA500'
+    },
+    'D': { 
+        value: 2, 
+        label: 'D-Tier', 
+        description: 'Below Average - Subpar performance needing improvement',
+        color: '#FF6B6B'
+    },
+    'E': { 
+        value: 1, 
+        label: 'E-Tier', 
+        description: 'Poor - Significant issues and poor quality',
+        color: '#DC143C'
+    }
+};
+
+const BRAND_COLOR = 0x5865F2; // Discord Blurple
+const SUCCESS_COLOR = 0x57F287; // Discord Green
+const WARNING_COLOR = 0xFEE75C; // Discord Yellow
+const ERROR_COLOR = 0xED4245; // Discord Red
+
+client.on('ready', () => {
+    console.log(`TierVote Pro: ${client.user.tag} is now online and ready!`);
+    
+    // Set professional bot status
+    client.user.setActivity('tier list votes | /vote', { 
+        type: ActivityType.Watching 
+    });
+});
+
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+
+    // Handle /vote command
+    if (message.content.startsWith('/vote')) {
+        await handleVoteCommand(message);
+    }
+    
+    // Handle /help command
+    if (message.content === '/help' || message.content === '/commands') {
+        await sendHelpMessage(message);
+    }
+});
+
+async function handleVoteCommand(message) {
+    const args = message.content.split(' ');
+    
+    if (args.length < 3) {
+        const errorEmbed = new EmbedBuilder()
+            .setTitle('Invalid Command Usage')
+            .setDescription('**Correct Usage:**\n```/vote <topic> <duration>```\n\n**Examples:**\n• `/vote "Best Development Framework" 1m`\n• `/vote "Quarterly Performance Review" 30s`\n• `/vote "Product Feature Priority" 2m`')
+            .setColor(ERROR_COLOR)
+            .setFooter({ text: 'TierVote Pro • Professional Voting System' })
+            .setTimestamp();
+        
+        return message.reply({ embeds: [errorEmbed] });
+    }
+
+    const topic = args.slice(1, -1).join(' ');
+    const durationArg = args[args.length - 1].toLowerCase();
+    
+    // Parse and validate duration
+    const duration = parseDuration(durationArg);
+    if (!duration.valid) {
+        const errorEmbed = new EmbedBuilder()
+            .setTitle('Invalid Duration Format')
+            .setDescription('**Valid Duration Formats:**\n• `30s` - 30 seconds\n• `1m` - 1 minute\n• `5m` - 5 minutes\n\n**Duration Limits:** 15 seconds to 10 minutes')
+            .setColor(ERROR_COLOR)
+            .setFooter({ text: 'TierVote Pro' })
+            .setTimestamp();
+        
+        return message.reply({ embeds: [errorEmbed] });
+    }
+
+    // Check for active vote in channel
+    if (activeVotes.has(message.channel.id)) {
+        const warningEmbed = new EmbedBuilder()
+            .setTitle('Vote Already Active')
+            .setDescription('There is already an active vote in this channel. Please wait for it to complete before starting a new one.')
+            .setColor(WARNING_COLOR)
+            .setFooter({ text: 'TierVote Pro' })
+            .setTimestamp();
+        
+        return message.reply({ embeds: [warningEmbed] });
+    }
+
+    // Create professional voting embed
+    const voteEmbed = new EmbedBuilder()
+        .setTitle(`Tier List Vote`)
+        .setDescription(`**Topic:** ${topic}\n\nSelect your tier classification from the dropdown menu below. Each tier represents a different level of quality and performance.\n\n**Tier Classifications:**\n${Object.entries(tierConfig).map(([tier, config]) => 
+            `**${config.label}** - ${config.description.split(' - ')[1]}`
+        ).join('\n')}`)
+        .setColor(BRAND_COLOR)
+        .addFields([
+            {
+                name: 'Vote Duration',
+                value: `${durationArg}`,
+                inline: true
+            },
+            {
+                name: 'Participants',
+                value: '0 votes',
+                inline: true
+            },
+            {
+                name: 'Status',
+                value: 'Active',
+                inline: true
+            }
+        ])
+        .setFooter({ 
+            text: `Started by ${message.author.displayName} • TierVote Pro`,
+            iconURL: message.author.displayAvatarURL({ dynamic: true })
+        })
+        .setTimestamp();
+
+    // Create professional dropdown menu
+    const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId('tier_vote_select')
+        .setPlaceholder('Select a tier classification')
+        .addOptions(
+            Object.entries(tierConfig).map(([tier, config]) => ({
+                label: config.label,
+                description: config.description,
+                value: `vote_${tier}`
+            }))
+        );
+
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+
+    const voteMessage = await message.channel.send({
+        embeds: [voteEmbed],
+        components: [row]
+    });
+
+    // Store vote data
+    const voteData = {
+        topic,
+        messageId: voteMessage.id,
+        authorId: message.author.id,
+        authorName: message.author.displayName,
+        votes: new Map(),
+        startTime: Date.now(),
+        duration: duration.milliseconds,
+        durationText: durationArg
+    };
+
+    activeVotes.set(message.channel.id, voteData);
+
+    // Set timeout to end vote
+    setTimeout(async () => {
+        await endVote(message.channel.id, voteMessage);
+    }, duration.milliseconds);
+
+    // Update vote count every 10 seconds
+    const updateInterval = setInterval(async () => {
+        if (!activeVotes.has(message.channel.id)) {
+            clearInterval(updateInterval);
+            return;
+        }
+        await updateVoteEmbed(voteMessage, voteData);
+    }, 10000);
+}
+
+async function sendHelpMessage(message) {
+    const helpEmbed = new EmbedBuilder()
+        .setTitle('TierVote Pro - Command Guide')
+        .setDescription('**Professional tier list voting system for Discord communities**')
+        .setColor(BRAND_COLOR)
+        .addFields([
+            {
+                name: 'Start a Vote',
+                value: '```/vote <topic> <duration>```\n**Examples:**\n• `/vote "Performance Framework" 2m`\n• `/vote "Product Quality Assessment" 1m`',
+                inline: false
+            },
+            {
+                name: 'Duration Formats',
+                value: '• `30s` - 30 seconds\n• `1m` - 1 minute\n• `5m` - 5 minutes\n• **Range:** 15s to 10m',
+                inline: true
+            },
+            {
+                name: 'Tier System',
+                value: `${Object.entries(tierConfig).map(([tier, config]) => 
+                    `**${tier}** - ${config.description.split(' - ')[1]}`
+                ).join('\n')}`,
+                inline: true
+            },
+            {
+                name: 'Features',
+                value: '• Real-time vote tracking\n• Automatic tier averaging\n• Professional result display\n• One vote per user\n• Vote modification allowed',
+                inline: false
+            }
+        ])
+        .setThumbnail(client.user.displayAvatarURL({ dynamic: true }))
+        .setFooter({ text: 'TierVote Pro • Professional Voting Solution' })
+        .setTimestamp();
+
+    await message.reply({ embeds: [helpEmbed] });
+}
+
+function parseDuration(durationStr) {
+    const match = durationStr.match(/^(\d+)([sm])$/);
+    if (!match) return { valid: false };
+
+    const [, amount, unit] = match;
+    const num = parseInt(amount);
+    
+    let milliseconds;
+    if (unit === 's') {
+        milliseconds = num * 1000;
+    } else if (unit === 'm') {
+        milliseconds = num * 60 * 1000;
+    }
+
+    const valid = milliseconds >= 15000 && milliseconds <= 600000;
+    return { valid, milliseconds };
+}
+
+async function updateVoteEmbed(voteMessage, voteData) {
+    try {
+        const voteCount = voteData.votes.size;
+        const timeRemaining = Math.max(0, voteData.duration - (Date.now() - voteData.startTime));
+        const timeRemainingText = formatTimeRemaining(timeRemaining);
+
+        const updatedEmbed = EmbedBuilder.from(voteMessage.embeds[0])
+            .setFields([
+                {
+                    name: 'Time Remaining',
+                    value: timeRemainingText,
+                    inline: true
+                },
+                {
+                    name: 'Participants',
+                    value: `${voteCount} vote${voteCount !== 1 ? 's' : ''}`,
+                    inline: true
+                },
+                {
+                    name: 'Status',
+                    value: timeRemaining > 0 ? 'Active' : 'Ending',
+                    inline: true
+                }
+            ]);
+
+        await voteMessage.edit({ embeds: [updatedEmbed] });
+    } catch (error) {
+        console.error('Error updating vote embed:', error);
+    }
+}
+
+function formatTimeRemaining(milliseconds) {
+    if (milliseconds <= 0) return '0s';
+    
+    const seconds = Math.ceil(milliseconds / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+}
+
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isStringSelectMenu()) return;
+
+    if (interaction.customId !== 'tier_vote_select') return;
+
+    const channelId = interaction.channel.id;
+    const voteData = activeVotes.get(channelId);
+
+    if (!voteData) {
+        const errorEmbed = new EmbedBuilder()
+            .setTitle('Vote Expired')
+            .setDescription('This vote has already ended or expired.')
+            .setColor(ERROR_COLOR)
+            .setFooter({ text: 'TierVote Pro' });
+        
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+    }
+
+    const selectedValue = interaction.values[0];
+    if (!selectedValue.startsWith('vote_')) return;
+
+    const tier = selectedValue.split('_')[1];
+    const userId = interaction.user.id;
+    const config = tierConfig[tier];
+
+    // Record the vote
+    const previousVote = voteData.votes.get(userId);
+    voteData.votes.set(userId, tier);
+
+    const responseEmbed = new EmbedBuilder()
+        .setTitle('Vote Recorded')
+        .setDescription(`You selected **${config.label}**\n\n${config.description}`)
+        .setColor(parseInt(config.color.replace('#', ''), 16))
+        .setFooter({ text: previousVote ? 'Vote updated • TierVote Pro' : 'Vote recorded • TierVote Pro' })
+        .setTimestamp();
+
+    await interaction.reply({ 
+        embeds: [responseEmbed], 
+        ephemeral: true 
+    });
+});
+
+async function endVote(channelId, voteMessage) {
+    const voteData = activeVotes.get(channelId);
+    if (!voteData) return;
+
+    const votes = voteData.votes;
+    const channel = voteMessage.channel;
+
+    // Calculate comprehensive results
+    const tierCounts = { S: 0, A: 0, B: 0, C: 0, D: 0, E: 0 };
+    let totalVotes = 0;
+    let totalValue = 0;
+
+    for (const tier of votes.values()) {
+        tierCounts[tier]++;
+        totalVotes++;
+        totalValue += tierConfig[tier].value;
+    }
+
+    // Calculate average and determine final tier
+    let finalTier = 'E';
+    let averageScore = 0;
+    
+    if (totalVotes > 0) {
+        averageScore = totalValue / totalVotes;
+        
+        if (averageScore >= 5.5) finalTier = 'S';
+        else if (averageScore >= 4.5) finalTier = 'A';
+        else if (averageScore >= 3.5) finalTier = 'B';
+        else if (averageScore >= 2.5) finalTier = 'C';
+        else if (averageScore >= 1.5) finalTier = 'D';
+        else finalTier = 'E';
+    }
+
+    const finalConfig = tierConfig[finalTier];
+    
+    // Create professional results embed
+    const resultsEmbed = new EmbedBuilder()
+        .setTitle('Vote Results')
+        .setDescription(`**Topic:** ${voteData.topic}`)
+        .setColor(SUCCESS_COLOR)
+        .addFields([
+            {
+                name: `Final Tier Classification`,
+                value: `**${finalConfig.label}**\n${finalConfig.description}\n\nAverage Score: ${averageScore.toFixed(2)}/6.00`,
+                inline: false
+            },
+            {
+                name: 'Vote Distribution',
+                value: Object.entries(tierCounts)
+                    .filter(([, count]) => count > 0)
+                    .map(([tier, count]) => {
+                        const config = tierConfig[tier];
+                        const percentage = ((count / totalVotes) * 100).toFixed(1);
+                        return `**${config.label}**: ${count} vote${count !== 1 ? 's' : ''} (${percentage}%)`;
+                    })
+                    .join('\n') || 'No votes received',
+                inline: true
+            },
+            {
+                name: 'Statistics',
+                value: `**Total Participants:** ${totalVotes}\n**Vote Duration:** ${voteData.durationText}\n**Completion Rate:** 100%`,
+                inline: true
+            }
+        ])
+        .setFooter({ 
+            text: `Vote ended • Started by ${voteData.authorName} • TierVote Pro`,
+            iconURL: voteMessage.client.users.cache.get(voteData.authorId)?.displayAvatarURL({ dynamic: true })
+        })
+        .setTimestamp();
+
+    // Create disabled dropdown for final display
+    const disabledSelectMenu = new StringSelectMenuBuilder()
+        .setCustomId('tier_vote_select_disabled')
+        .setPlaceholder('Vote has ended')
+        .setDisabled(true)
+        .addOptions([
+            {
+                label: 'Vote Ended',
+                description: 'This vote is no longer active',
+                value: 'disabled'
+            }
+        ]);
+
+    const disabledRow = new ActionRowBuilder().addComponents(disabledSelectMenu);
+
+    // Update original message
+    const finalVoteEmbed = EmbedBuilder.from(voteMessage.embeds[0])
+        .setColor(0x747F8D) // Gray color for ended vote
+        .setFields([
+            {
+                name: 'Status',
+                value: 'Ended',
+                inline: true
+            },
+            {
+                name: 'Final Count',
+                value: `${totalVotes} vote${totalVotes !== 1 ? 's' : ''}`,
+                inline: true
+            },
+            {
+                name: 'Result',
+                value: finalConfig.label,
+                inline: true
+            }
+        ]);
+
+    await voteMessage.edit({
+        embeds: [finalVoteEmbed],
+        components: [disabledRow]
+    });
+
+    // Send comprehensive results
+    await channel.send({ embeds: [resultsEmbed] });
+
+    // Cleanup
+    activeVotes.delete(channelId);
+}
+
+// Error handling
+process.on('unhandledRejection', (error) => {
+    console.error('Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught exception:', error);
+    process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+    console.log('Shutting down gracefully...');
+    client.destroy();
+    process.exit(0);
+});
+
+// Login with bot token
+client.login(process.env.DISCORD_TOKEN);
