@@ -1,7 +1,7 @@
 {
-  "name": "discord-tierlist-bot",
+  "name": "tiervote-pro-discord-bot",
   "version": "1.0.0",
-  "description": "A Discord bot for tier list voting with averaging",
+  "description": "Professional Discord bot for tier list voting with dropdown interface and averaging system",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -17,7 +17,9 @@
     "discord",
     "bot",
     "tierlist",
-    "voting"
+    "voting",
+    "professional",
+    "dropdown"
   ],
   "author": "Your Name",
   "license": "MIT"
