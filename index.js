@@ -117,110 +117,124 @@ async function handleVoteCommand(message) {
             return message.reply({ embeds: [errorEmbed] });
         }
 
-    const topic = args.slice(1, -1).join(' ');
-    const durationArg = args[args.length - 1].toLowerCase();
-    
-    // Parse and validate duration
-    const duration = parseDuration(durationArg);
-    if (!duration.valid) {
-        const errorEmbed = new EmbedBuilder()
-            .setTitle('Invalid Duration Format')
-            .setDescription('**Valid Duration Formats:**\n• `30s` - 30 seconds\n• `1m` - 1 minute\n• `5m` - 5 minutes\n\n**Duration Limits:** 15 seconds to 10 minutes')
-            .setColor(ERROR_COLOR)
-            .setFooter({ text: 'TierVote Pro' })
-            .setTimestamp();
+        const topic = args.slice(1, -1).join(' ');
+        const durationArg = args[args.length - 1].toLowerCase();
         
-        return message.reply({ embeds: [errorEmbed] });
-    }
-
-    // Check for active vote in channel
-    if (activeVotes.has(message.channel.id)) {
-        const warningEmbed = new EmbedBuilder()
-            .setTitle('Vote Already Active')
-            .setDescription('There is already an active vote in this channel. Please wait for it to complete before starting a new one.')
-            .setColor(WARNING_COLOR)
-            .setFooter({ text: 'TierVote Pro' })
-            .setTimestamp();
-        
-        return message.reply({ embeds: [warningEmbed] });
-    }
-
-    // Create professional voting embed
-    const voteEmbed = new EmbedBuilder()
-        .setTitle(`Tier List Vote`)
-        .setDescription(`**Topic:** ${topic}\n\nSelect your tier classification from the dropdown menu below. Each tier represents a different level of quality and performance.\n\n**Tier Classifications:**\n${Object.entries(tierConfig).map(([tier, config]) => 
-            `**${config.label}** - ${config.description.split(' - ')[1]}`
-        ).join('\n')}`)
-        .setColor(BRAND_COLOR)
-        .addFields([
-            {
-                name: 'Vote Duration',
-                value: `${durationArg}`,
-                inline: true
-            },
-            {
-                name: 'Participants',
-                value: '0 votes',
-                inline: true
-            },
-            {
-                name: 'Status',
-                value: 'Active',
-                inline: true
-            }
-        ])
-        .setFooter({ 
-            text: `Started by ${message.author.displayName} • TierVote Pro`,
-            iconURL: message.author.displayAvatarURL({ dynamic: true })
-        })
-        .setTimestamp();
-
-    // Create professional dropdown menu
-    const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId('tier_vote_select')
-        .setPlaceholder('Select a tier classification')
-        .addOptions(
-            Object.entries(tierConfig).map(([tier, config]) => ({
-                label: config.label,
-                description: config.description,
-                value: `vote_${tier}`
-            }))
-        );
-
-    const row = new ActionRowBuilder().addComponents(selectMenu);
-
-    const voteMessage = await message.channel.send({
-        embeds: [voteEmbed],
-        components: [row]
-    });
-
-    // Store vote data
-    const voteData = {
-        topic,
-        messageId: voteMessage.id,
-        authorId: message.author.id,
-        authorName: message.author.displayName,
-        votes: new Map(),
-        startTime: Date.now(),
-        duration: duration.milliseconds,
-        durationText: durationArg
-    };
-
-    activeVotes.set(message.channel.id, voteData);
-
-    // Set timeout to end vote
-    setTimeout(async () => {
-        await endVote(message.channel.id, voteMessage);
-    }, duration.milliseconds);
-
-    // Update vote count every 10 seconds
-    const updateInterval = setInterval(async () => {
-        if (!activeVotes.has(message.channel.id)) {
-            clearInterval(updateInterval);
-            return;
+        // Parse and validate duration
+        const duration = parseDuration(durationArg);
+        if (!duration.valid) {
+            const errorEmbed = new EmbedBuilder()
+                .setTitle('Invalid Duration Format')
+                .setDescription('**Valid Duration Formats:**\n• `30s` - 30 seconds\n• `1m` - 1 minute\n• `5m` - 5 minutes\n\n**Duration Limits:** 15 seconds to 10 minutes')
+                .setColor(ERROR_COLOR)
+                .setFooter({ text: 'TierVote Pro' })
+                .setTimestamp();
+            
+            return message.reply({ embeds: [errorEmbed] });
         }
-        await updateVoteEmbed(voteMessage, voteData);
-    }, 10000);
+
+        // Check for active vote in channel
+        if (activeVotes.has(message.channel.id)) {
+            const warningEmbed = new EmbedBuilder()
+                .setTitle('Vote Already Active')
+                .setDescription('There is already an active vote in this channel. Please wait for it to complete before starting a new one.')
+                .setColor(WARNING_COLOR)
+                .setFooter({ text: 'TierVote Pro' })
+                .setTimestamp();
+            
+            return message.reply({ embeds: [warningEmbed] });
+        }
+
+        // Create professional voting embed
+        const voteEmbed = new EmbedBuilder()
+            .setTitle(`Tier List Vote`)
+            .setDescription(`**Topic:** ${topic}\n\nSelect your tier classification from the dropdown menu below. Each tier represents a different level of quality and performance.\n\n**Tier Classifications:**\n${Object.entries(tierConfig).map(([tier, config]) => 
+                `**${config.label}** - ${config.description.split(' - ')[1]}`
+            ).join('\n')}`)
+            .setColor(BRAND_COLOR)
+            .addFields([
+                {
+                    name: 'Vote Duration',
+                    value: `${durationArg}`,
+                    inline: true
+                },
+                {
+                    name: 'Participants',
+                    value: '0 votes',
+                    inline: true
+                },
+                {
+                    name: 'Status',
+                    value: 'Active',
+                    inline: true
+                }
+            ])
+            .setFooter({ 
+                text: `Started by ${message.author.displayName} • TierVote Pro`,
+                iconURL: message.author.displayAvatarURL({ dynamic: true })
+            })
+            .setTimestamp();
+
+        // Create professional dropdown menu
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId('tier_vote_select')
+            .setPlaceholder('Select a tier classification')
+            .addOptions(
+                Object.entries(tierConfig).map(([tier, config]) => ({
+                    label: config.label,
+                    description: config.description,
+                    value: `vote_${tier}`
+                }))
+            );
+
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+
+        const voteMessage = await message.channel.send({
+            embeds: [voteEmbed],
+            components: [row]
+        });
+
+        // Store vote data
+        const voteData = {
+            topic,
+            messageId: voteMessage.id,
+            authorId: message.author.id,
+            authorName: message.author.displayName,
+            votes: new Map(),
+            startTime: Date.now(),
+            duration: duration.milliseconds,
+            durationText: durationArg
+        };
+
+        activeVotes.set(message.channel.id, voteData);
+
+        // Set timeout to end vote
+        setTimeout(async () => {
+            await endVote(message.channel.id, voteMessage);
+        }, duration.milliseconds);
+
+        // Update vote count every 10 seconds
+        const updateInterval = setInterval(async () => {
+            try {
+                if (!activeVotes.has(message.channel.id)) {
+                    clearInterval(updateInterval);
+                    return;
+                }
+                await updateVoteEmbed(voteMessage, voteData);
+            } catch (updateError) {
+                console.error('Error in update interval:', updateError);
+                clearInterval(updateInterval);
+            }
+        }, 10000);
+
+    } catch (error) {
+        console.error('Error in handleVoteCommand:', error);
+        try {
+            await message.reply('❌ An error occurred while creating the vote. Please try again.');
+        } catch (replyError) {
+            console.error('Failed to send error message:', replyError);
+        }
+    }
 }
 
 async function sendHelpMessage(message) {
