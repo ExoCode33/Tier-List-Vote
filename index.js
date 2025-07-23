@@ -60,7 +60,7 @@ client.on('ready', () => {
     console.log(`TierVote Pro: ${client.user.tag} is now online and ready!`);
     
     // Set professional bot status
-    client.user.setActivity('tier list votes | /vote', { 
+    client.user.setActivity('tier list votes | /Tier-Vote', { 
         type: ActivityType.Watching 
     });
 });
@@ -68,8 +68,8 @@ client.on('ready', () => {
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    // Handle /vote command
-    if (message.content.startsWith('/vote')) {
+    // Handle /Tier-Vote command
+    if (message.content.startsWith('/Tier-Vote')) {
         await handleVoteCommand(message);
     }
     
@@ -85,7 +85,7 @@ async function handleVoteCommand(message) {
     if (args.length < 3) {
         const errorEmbed = new EmbedBuilder()
             .setTitle('Invalid Command Usage')
-            .setDescription('**Correct Usage:**\n```/vote <topic> <duration>```\n\n**Examples:**\n• `/vote "Best Development Framework" 1m`\n• `/vote "Quarterly Performance Review" 30s`\n• `/vote "Product Feature Priority" 2m`')
+            .setDescription('**Correct Usage:**\n```/Tier-Vote <topic> <duration>```\n\n**Examples:**\n• `/Tier-Vote "Best Development Framework" 1m`\n• `/Tier-Vote "Quarterly Performance Review" 30s`\n• `/Tier-Vote "Product Feature Priority" 2m`')
             .setColor(ERROR_COLOR)
             .setFooter({ text: 'TierVote Pro • Professional Voting System' })
             .setTimestamp();
@@ -207,7 +207,7 @@ async function sendHelpMessage(message) {
         .addFields([
             {
                 name: 'Start a Vote',
-                value: '```/vote <topic> <duration>```\n**Examples:**\n• `/vote "Performance Framework" 2m`\n• `/vote "Product Quality Assessment" 1m`',
+                value: '```/Tier-Vote <topic> <duration>```\n**Examples:**\n• `/Tier-Vote "Performance Framework" 2m`\n• `/Tier-Vote "Product Quality Assessment" 1m`',
                 inline: false
             },
             {
