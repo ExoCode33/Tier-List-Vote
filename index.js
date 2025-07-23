@@ -144,20 +144,8 @@ async function handleVoteCommand(message) {
                 value: 'Active',
                 inline: true
             }
-        ]);
-
-    // Add voter analysis if there are votes
-    if (totalVotes > 0) {
-        resultsEmbed.addFields([
-            {
-                name: 'Voter Analysis',
-                value: `**Highest Rating (${tierConfig[highestRating.tier].label}):** ${formatUsers(highestVoterNames)}\n**Lowest Rating (${tierConfig[lowestRating.tier].label}):** ${formatUsers(lowestVoterNames)}`,
-                inline: false
-            }
-        ]);
-    }
-
-    resultsEmbed.setFooter({ 
+        ])
+        .setFooter({ 
             text: `Started by ${message.author.displayName} • TierVote Pro`,
             iconURL: message.author.displayAvatarURL({ dynamic: true })
         })
@@ -458,11 +446,23 @@ async function endVote(channelId, voteMessage) {
                 inline: true
             }
         ]);
+
+    // Add voter analysis if there are votes
+    if (totalVotes > 0) {
+        resultsEmbed.addFields([
+            {
+                name: 'Voter Analysis',
+                value: `**Highest Rating (${tierConfig[highestRating.tier].label}):** ${formatUsers(highestVoterNames)}\n**Lowest Rating (${tierConfig[lowestRating.tier].label}):** ${formatUsers(lowestVoterNames)}`,
+                inline: false
+            }
+        ]);
+    }
+
     resultsEmbed.setFooter({
-            text: `Vote ended • Started by ${voteData.authorName} • TierVote Pro`,
-            iconURL: voteMessage.client.users.cache.get(voteData.authorId)?.displayAvatarURL({ dynamic: true })
-        })
-        .setTimestamp();
+        text: `Vote ended • Started by ${voteData.authorName} • TierVote Pro`,
+        iconURL: voteMessage.client.users.cache.get(voteData.authorId)?.displayAvatarURL({ dynamic: true })
+    })
+    .setTimestamp();
 
     // Create disabled dropdown for final display
     const disabledSelectMenu = new StringSelectMenuBuilder()
