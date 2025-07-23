@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ActivityType } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ActivityType, SlashCommandBuilder, REST, Routes } = require('discord.js');
 
 const client = new Client({
     intents: [
@@ -56,99 +56,119 @@ const SUCCESS_COLOR = 0x57F287; // Discord Green
 const WARNING_COLOR = 0xFEE75C; // Discord Yellow
 const ERROR_COLOR = 0xED4245; // Discord Red
 
-client.on('ready', () => {
+// Define slash commands
+const commands = [
+    new SlashCommandBuilder()
+        .setName('tier-vote')
+        .setDescription('Start a professional tier list vote')
+        .addStringOption(option =>
+            option.setName('topic')
+                .setDescription('The topic to vote on')
+                .setRequired(true)
+                .setMaxLength(100))
+        .addStringOption(option =>
+            option.setName('duration')
+                .setDescription('Vote duration (e.g., 30s, 1m, 5m)')
+                .setRequired(true)
+                .addChoices(
+                    { name: '30 seconds', value: '30s' },
+                    { name: '1 minute', value: '1m' },
+                    { name: '2 minutes', value: '2m' },
+                    { name: '3 minutes', value: '3m' },
+                    { name: '5 minutes', value: '5m' },
+                    { name: '10 minutes', value: '10m' }
+                )),
+    new SlashCommandBuilder()
+        .setName('help')
+        .setDescription('Show TierVote Pro command guide and information')
+];
+
+// Register slash commands
+async function registerCommands() {
+    try {
+        console.log('🔄 Registering slash commands...');
+        
+        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+        
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commands.map(command => command.toJSON()) }
+        );
+        
+        console.log('✅ Successfully registered slash commands globally!');
+    } catch (error) {
+        console.error('❌ Error registering slash commands:', error);
+    }
+}
+
+client.on('ready', async () => {
     console.log(`✅ TierVote Pro: ${client.user.tag} is now online and ready!`);
     console.log(`📊 Bot ID: ${client.user.id}`);
-    console.log(`🔗 Invite URL: https://discord.com/api/oauth2/authorize?client_id=${client.user.id}&permissions=274877916160&scope=bot`);
+    console.log(`🔗 Invite URL: https://discord.com/api/oauth2/authorize?client_id=${client.user.id}&permissions=274877916160&scope=bot%20applications.commands`);
+    
+    // Register slash commands
+    await registerCommands();
     
     // Set professional bot status
-    client.user.setActivity('tier list votes | /Tier-Vote', { 
+    client.user.setActivity('tier list votes | /tier-vote', { 
         type: ActivityType.Watching 
     });
 });
 
-client.on('messageCreate', async (message) => {
+// Handle slash command interactions
+client.on('interactionCreate', async (interaction) => {
     try {
-        // More detailed logging
-        console.log(`📨 Message from ${message.author.username} (${message.author.id}): "${message.content}"`);
-        console.log(`🤖 Is bot: ${message.author.bot}`);
-        console.log(`📍 Channel: ${message.channel.name || 'DM'} (${message.channel.id})`);
-        
-        if (message.author.bot) {
-            console.log('❌ Ignoring bot message');
-            return;
+        if (interaction.isChatInputCommand()) {
+            console.log(`💬 Slash command received: /${interaction.commandName}`);
+            
+            if (interaction.commandName === 'tier-vote') {
+                await handleSlashVoteCommand(interaction);
+            } else if (interaction.commandName === 'help') {
+                await handleSlashHelpCommand(interaction);
+            }
+        } else if (interaction.isStringSelectMenu()) {
+            await handleSelectMenu(interaction);
         }
-
-        // Debug logging
-        console.log(`📝 Processing message: "${message.content}"`);
-
-        // Handle /Tier-Vote command (case insensitive)
-        if (message.content.toLowerCase().startsWith('/tier-vote')) {
-            console.log('🗳️ Tier-Vote command detected!');
-            await handleVoteCommand(message);
-            return;
-        }
-        
-        // Handle /help command
-        if (message.content === '/help' || message.content === '/commands') {
-            console.log('❓ Help command detected!');
-            await sendHelpMessage(message);
-            return;
-        }
-
-        // Test command to verify bot is working
-        if (message.content === '/test') {
-            console.log('🧪 Test command detected!');
-            await message.reply('✅ Bot is working! Try `/Tier-Vote "Test Topic" 30s`');
-            return;
-        }
-
-        console.log('🔍 No matching command found');
     } catch (error) {
-        console.error('❌ Error in messageCreate:', error);
-        try {
-            await message.reply('❌ An error occurred. Please try again.');
-        } catch (replyError) {
-            console.error('❌ Failed to send error message:', replyError);
+        console.error('❌ Error handling interaction:', error);
+        
+        const errorEmbed = new EmbedBuilder()
+            .setTitle('Error')
+            .setDescription('An error occurred while processing your request.')
+            .setColor(ERROR_COLOR);
+        
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ embeds: [errorEmbed], ephemeral: true });
+        } else {
+            await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
         }
     }
 });
 
-async function handleVoteCommand(message) {
+async function handleSlashVoteCommand(interaction) {
     try {
-        console.log('handleVoteCommand called');
-        const args = message.content.split(' ');
-        console.log('Args:', args);
+        console.log('🗳️ Processing slash vote command');
         
-        if (args.length < 3) {
-            const errorEmbed = new EmbedBuilder()
-                .setTitle('Invalid Command Usage')
-                .setDescription('**Correct Usage:**\n```/Tier-Vote <topic> <duration>```\n\n**Examples:**\n• `/Tier-Vote "Best Development Framework" 1m`\n• `/Tier-Vote "Test Topic" 30s`\n• `/Tier-Vote "Product Feature Priority" 2m`')
-                .setColor(ERROR_COLOR)
-                .setFooter({ text: 'TierVote Pro • Professional Voting System' })
-                .setTimestamp();
-            
-            return message.reply({ embeds: [errorEmbed] });
-        }
-
-        const topic = args.slice(1, -1).join(' ');
-        const durationArg = args[args.length - 1].toLowerCase();
+        const topic = interaction.options.getString('topic');
+        const durationArg = interaction.options.getString('duration');
+        
+        console.log(`📝 Topic: "${topic}", Duration: "${durationArg}"`);
         
         // Parse and validate duration
         const duration = parseDuration(durationArg);
         if (!duration.valid) {
             const errorEmbed = new EmbedBuilder()
                 .setTitle('Invalid Duration Format')
-                .setDescription('**Valid Duration Formats:**\n• `30s` - 30 seconds\n• `1m` - 1 minute\n• `5m` - 5 minutes\n\n**Duration Limits:** 15 seconds to 10 minutes')
+                .setDescription('Please select a valid duration from the dropdown options.')
                 .setColor(ERROR_COLOR)
                 .setFooter({ text: 'TierVote Pro' })
                 .setTimestamp();
             
-            return message.reply({ embeds: [errorEmbed] });
+            return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
         }
 
         // Check for active vote in channel
-        if (activeVotes.has(message.channel.id)) {
+        if (activeVotes.has(interaction.channel.id)) {
             const warningEmbed = new EmbedBuilder()
                 .setTitle('Vote Already Active')
                 .setDescription('There is already an active vote in this channel. Please wait for it to complete before starting a new one.')
@@ -156,7 +176,7 @@ async function handleVoteCommand(message) {
                 .setFooter({ text: 'TierVote Pro' })
                 .setTimestamp();
             
-            return message.reply({ embeds: [warningEmbed] });
+            return interaction.reply({ embeds: [warningEmbed], ephemeral: true });
         }
 
         // Create professional voting embed
@@ -184,8 +204,8 @@ async function handleVoteCommand(message) {
                 }
             ])
             .setFooter({ 
-                text: `Started by ${message.author.displayName} • TierVote Pro`,
-                iconURL: message.author.displayAvatarURL({ dynamic: true })
+                text: `Started by ${interaction.user.displayName} • TierVote Pro`,
+                iconURL: interaction.user.displayAvatarURL({ dynamic: true })
             })
             .setTimestamp();
 
@@ -203,34 +223,36 @@ async function handleVoteCommand(message) {
 
         const row = new ActionRowBuilder().addComponents(selectMenu);
 
-        const voteMessage = await message.channel.send({
+        const response = await interaction.reply({
             embeds: [voteEmbed],
             components: [row]
         });
+
+        const voteMessage = await response.fetch();
 
         // Store vote data
         const voteData = {
             topic,
             messageId: voteMessage.id,
-            authorId: message.author.id,
-            authorName: message.author.displayName,
+            authorId: interaction.user.id,
+            authorName: interaction.user.displayName,
             votes: new Map(),
             startTime: Date.now(),
             duration: duration.milliseconds,
             durationText: durationArg
         };
 
-        activeVotes.set(message.channel.id, voteData);
+        activeVotes.set(interaction.channel.id, voteData);
 
         // Set timeout to end vote
         setTimeout(async () => {
-            await endVote(message.channel.id, voteMessage);
+            await endVote(interaction.channel.id, voteMessage);
         }, duration.milliseconds);
 
         // Update vote count every 10 seconds
         const updateInterval = setInterval(async () => {
             try {
-                if (!activeVotes.has(message.channel.id)) {
+                if (!activeVotes.has(interaction.channel.id)) {
                     clearInterval(updateInterval);
                     return;
                 }
@@ -242,16 +264,22 @@ async function handleVoteCommand(message) {
         }, 10000);
 
     } catch (error) {
-        console.error('Error in handleVoteCommand:', error);
-        try {
-            await message.reply('❌ An error occurred while creating the vote. Please try again.');
-        } catch (replyError) {
-            console.error('Failed to send error message:', replyError);
+        console.error('❌ Error in handleSlashVoteCommand:', error);
+        
+        const errorEmbed = new EmbedBuilder()
+            .setTitle('Error')
+            .setDescription('An error occurred while creating the vote. Please try again.')
+            .setColor(ERROR_COLOR);
+        
+        if (interaction.replied) {
+            await interaction.followUp({ embeds: [errorEmbed], ephemeral: true });
+        } else {
+            await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
         }
     }
 }
 
-async function sendHelpMessage(message) {
+async function handleSlashHelpCommand(interaction) {
     const helpEmbed = new EmbedBuilder()
         .setTitle('TierVote Pro - Command Guide')
         .setDescription('**Professional tier list voting system for Discord communities**')
@@ -259,12 +287,12 @@ async function sendHelpMessage(message) {
         .addFields([
             {
                 name: 'Start a Vote',
-                value: '```/Tier-Vote <topic> <duration>```\n**Examples:**\n• `/Tier-Vote "Performance Framework" 2m`\n• `/Tier-Vote "Product Quality Assessment" 1m`',
+                value: '```/tier-vote topic:<topic> duration:<duration>```\n**Examples:**\n• `/tier-vote topic:"Best Framework" duration:2m`\n• `/tier-vote topic:"Product Quality" duration:1m`',
                 inline: false
             },
             {
-                name: 'Duration Formats',
-                value: '• `30s` - 30 seconds\n• `1m` - 1 minute\n• `5m` - 5 minutes\n• **Range:** 15s to 10m',
+                name: 'Duration Options',
+                value: '• `30s` - 30 seconds\n• `1m` - 1 minute\n• `2m` - 2 minutes\n• `3m` - 3 minutes\n• `5m` - 5 minutes\n• `10m` - 10 minutes',
                 inline: true
             },
             {
@@ -276,7 +304,7 @@ async function sendHelpMessage(message) {
             },
             {
                 name: 'Features',
-                value: '• Real-time vote tracking\n• Automatic tier averaging\n• Professional result display\n• One vote per user\n• Vote modification allowed',
+                value: '• Real-time vote tracking\n• Automatic tier averaging\n• Professional result display\n• One vote per user\n• Vote modification allowed\n• Voter analysis (highest/lowest ratings)',
                 inline: false
             }
         ])
@@ -284,7 +312,47 @@ async function sendHelpMessage(message) {
         .setFooter({ text: 'TierVote Pro • Professional Voting Solution' })
         .setTimestamp();
 
-    await message.reply({ embeds: [helpEmbed] });
+    await interaction.reply({ embeds: [helpEmbed], ephemeral: true });
+}
+
+async function handleSelectMenu(interaction) {
+    if (interaction.customId !== 'tier_vote_select') return;
+
+    const channelId = interaction.channel.id;
+    const voteData = activeVotes.get(channelId);
+
+    if (!voteData) {
+        const errorEmbed = new EmbedBuilder()
+            .setTitle('Vote Expired')
+            .setDescription('This vote has already ended or expired.')
+            .setColor(ERROR_COLOR)
+            .setFooter({ text: 'TierVote Pro' });
+        
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+    }
+
+    const selectedValue = interaction.values[0];
+    if (!selectedValue.startsWith('vote_')) return;
+
+    const tier = selectedValue.split('_')[1];
+    const userId = interaction.user.id;
+    const config = tierConfig[tier];
+
+    // Record the vote
+    const previousVote = voteData.votes.get(userId);
+    voteData.votes.set(userId, tier);
+
+    const responseEmbed = new EmbedBuilder()
+        .setTitle('Vote Recorded')
+        .setDescription(`You selected **${config.label}**\n\n${config.description}`)
+        .setColor(parseInt(config.color.replace('#', ''), 16))
+        .setFooter({ text: previousVote ? 'Vote updated • TierVote Pro' : 'Vote recorded • TierVote Pro' })
+        .setTimestamp();
+
+    await interaction.reply({ 
+        embeds: [responseEmbed], 
+        ephemeral: true 
+    });
 }
 
 function parseDuration(durationStr) {
@@ -348,45 +416,32 @@ function formatTimeRemaining(milliseconds) {
 }
 
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isStringSelectMenu()) return;
-
-    if (interaction.customId !== 'tier_vote_select') return;
-
-    const channelId = interaction.channel.id;
-    const voteData = activeVotes.get(channelId);
-
-    if (!voteData) {
-        const errorEmbed = new EmbedBuilder()
-            .setTitle('Vote Expired')
-            .setDescription('This vote has already ended or expired.')
-            .setColor(ERROR_COLOR)
-            .setFooter({ text: 'TierVote Pro' });
+    try {
+        if (interaction.isChatInputCommand()) {
+            console.log(`💬 Slash command received: /${interaction.commandName}`);
+            
+            if (interaction.commandName === 'tier-vote') {
+                await handleSlashVoteCommand(interaction);
+            } else if (interaction.commandName === 'help') {
+                await handleSlashHelpCommand(interaction);
+            }
+        } else if (interaction.isStringSelectMenu()) {
+            await handleSelectMenu(interaction);
+        }
+    } catch (error) {
+        console.error('❌ Error handling interaction:', error);
         
-        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+        const errorEmbed = new EmbedBuilder()
+            .setTitle('Error')
+            .setDescription('An error occurred while processing your request.')
+            .setColor(ERROR_COLOR);
+        
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ embeds: [errorEmbed], ephemeral: true });
+        } else {
+            await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+        }
     }
-
-    const selectedValue = interaction.values[0];
-    if (!selectedValue.startsWith('vote_')) return;
-
-    const tier = selectedValue.split('_')[1];
-    const userId = interaction.user.id;
-    const config = tierConfig[tier];
-
-    // Record the vote
-    const previousVote = voteData.votes.get(userId);
-    voteData.votes.set(userId, tier);
-
-    const responseEmbed = new EmbedBuilder()
-        .setTitle('Vote Recorded')
-        .setDescription(`You selected **${config.label}**\n\n${config.description}`)
-        .setColor(parseInt(config.color.replace('#', ''), 16))
-        .setFooter({ text: previousVote ? 'Vote updated • TierVote Pro' : 'Vote recorded • TierVote Pro' })
-        .setTimestamp();
-
-    await interaction.reply({ 
-        embeds: [responseEmbed], 
-        ephemeral: true 
-    });
 });
 
 async function endVote(channelId, voteMessage) {
